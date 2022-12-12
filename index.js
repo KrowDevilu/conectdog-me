@@ -1,3 +1,7 @@
+const http = require('http')
+const hostname = '0.0.0.0'
+const port = 8081
+
 const express = require('express')
 const path = require('path');
 const multer = require('multer');
@@ -456,6 +460,7 @@ app.get('/deleteCom/:infoId/:sessao/:id',async function(req,res){
         res.redirect(`/${req.params.sessao}/${req.params.infoId}`)
     }
 })
-app.listen(8081,function(){
-    console.log("foi carai")
+
+app.listen(port,hostname, ()=>{
+    console.log(`http://${hostname}/${port}/`)
 })
