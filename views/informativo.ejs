@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= page.titulo %></title>
-    <link rel="stylesheet" href="/assets/general.css">
+    <title>Titulo</title>
+    <link rel="stylesheet" href="/assets/css/general.css">
+    <link rel="stylesheet" href="/assets/css/informativo.css">
 </head>
 <body>
     <div class="box">
@@ -13,7 +14,7 @@
         <header>
             <ul>
                 <li><a class="selected_nav">Home</a></li>
-                <li><a href="Doações/cartão/index.html">Doações</a></li>
+                <li><a href="/Doacoes/Cartao">Doações</a></li>
                 <li><a href="/pesquisa">Pets</a></li>
                 <li><a href="Sobre nós/index.html">Sobre Nós</a></li>
                 <li><a href="Contato/contato.html">Contato</a></li>
@@ -24,23 +25,27 @@
                 </div>
             </ul>
         </header>
-        <div style="margin-top: 100px;">
+        <div class="content">
+            <div class="info">
+        <div >
             <h1><%= page.titulo %></h1>
             <p><%= page.conteudo %></p>
-            <img src="http://localhost:8081/<%= page.imagem %>">
+        </div>
+        
+        <img src="http://localhost:8081/<%= page.imagem %>" class="imginfo">
         </div>
         <div>
             <h2>Comentários</h2>
-            <form action="/comentar/<%= tipo %>/<%= page._id %>" method="post">
+            <form action="/comentar/<%= tipo %>/<%= page.pk_id %>" method="post">
                 <input type="text" name="conteudo">
                 <button type="submit">Comentar</button>
             </form>
-            <ul>
+            <ul class="commentSection">
                 <% for(var i = 0; i< comentarios.length;i++) { %>
                     <h3><%=comentarios[i].userName%></h3>
                     <li><%=comentarios[i].conteudo%></li>   
                     <% if(Session == true && user._id.toString() == comentarios[i].commentedBy.toString()) { %>
-                        <a href="/deleteCom/<%= page._id%>/<%=tipo%>/<%=comentarios[i]._id%>">
+                        <a href="/deleteCom/<%= page.pk_id%>/<%=tipo%>/<%=comentarios[i]._id%>" class="deleteCom">
                             <button>Deletar Comentário</button>
                        </a>
                     <% } %>
@@ -49,5 +54,6 @@
             </ul>
         </div>
     </div>
+</div>
 </body>
 </html>

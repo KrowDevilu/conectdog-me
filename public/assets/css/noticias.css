@@ -1,11 +1,11 @@
 .tabs-select{
-    background-color: #FFD056;
+    background-color: #72A4F0;
 }
 .tabs-select h2{
-    color: #C06A3A;
+    color: #3267A6;
 }
 .tabs-select p{
-    color: #424242;
+    color: #FFFFFF;
 }
 body {
     margin: 0;
@@ -19,10 +19,9 @@ body {
     grid-template-areas: "header header"
                         "contentx contentx" ;
 }
-img{
+.infoimg{
     height: 200px;
 }
-
 a{
     text-decoration: none;
 }

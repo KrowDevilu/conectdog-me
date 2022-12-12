@@ -19,7 +19,7 @@ body {
     grid-template-areas: "header header"
                         "contentx contentx" ;
 }
-img{
+.infoimg{
     height: 200px;
 }
 

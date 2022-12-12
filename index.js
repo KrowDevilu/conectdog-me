@@ -4,6 +4,7 @@ const port = 8081
 
 const express = require('express')
 const path = require('path');
+const bcrypt = require("bcrypt");
 const multer = require('multer');
 const mongodb = require('mongodb')
 const bodyParser = require('body-parser')
@@ -52,13 +53,16 @@ app.post('/register',async function(req,res){
     }else{
         try {
             await client.connect();
+            const hashedPassword = await bcrypt.hash(req.body.senha, 10)
             await addUser(client,{
                 nome: req.body.nome,
                 email: req.body.email,
-                senha: req.body.senha,
+                senha: hashedPassword,
                 admin: false,
                 afiliated: false,
-                adopted: false
+                adopted: false,
+                vezesDoadas: 0,
+                quantidadeDoada: 0
             })
         } catch (e) {
             console.error(e);
@@ -80,7 +84,7 @@ app.post('/login',async function(req,res){
         await client.connect();
         const userExist = await client.db("myProject").collection("Usuarios").findOne({'email': req.body.email})
         if(userExist !== null){
-            if(userExist.senha === req.body.senha){
+            if(await bcrypt.compare(req.body.senha , userExist.senha)){
                 logged = true
                 user = userExist
                 inSession = true
@@ -118,15 +122,12 @@ async function adoptPet(client, newListing){
 }
 async function addNoticia(client, newListing){
     const result = await client.db("myProject").collection("Noticias").insertOne(newListing);
-    console.log(`New listing created with the following id: ${result.insertedId}`);
 }
 async function addDica(client, newListing){
     const result = await client.db("myProject").collection("Dicas").insertOne(newListing);
-    console.log(`New listing created with the following id: ${result.insertedId}`);
 }
 async function addComment(client, newListing){
     const result = await client.db("myProject").collection("Comentarios").insertOne(newListing);
-    console.log(`Novo Comentário em ${result.sessao}: ${result.insertedId}`);
 }
 async function createListing(client, newListing){
     const result = await client.db("myProject").collection("testeCollection").insertOne(newListing);
@@ -151,14 +152,17 @@ async function listDatabases(client){
     console.log("Databases:");
     databasesList.databases.forEach(db => console.log(` - ${db.name}`));
 };
-
-app.get('/',async function(req,res){
-    if(inSession == true && user.adopted == true){
+app.get('/',function(req,res){
+    res.redirect('/inicio')
+})
+app.get('/perfil',async function(req,res){
+    if(inSession == true){
         try {
             await client.connect();
             var o_id = new mongodb.ObjectID(user._id);
             const pets = await client.db("myProject").collection("AdoptPets").find({'AdoptedBy':o_id}).toArray()
-            res.render("home.ejs",{user: user,Session: inSession,pets: pets})
+            const arrecadacao = await client.db("myProject").collection("Arrecadacao").findOne({'_id':new mongodb.ObjectId('639725dc7b0ec6b6eb1a0831')})
+            res.render("perfil.ejs",{user: user,Session: inSession,pets: pets,arrecadado: arrecadacao})
         } catch (e) {
             console.error(e);
         }
@@ -166,7 +170,7 @@ app.get('/',async function(req,res){
             await client.close();
         }
     }else{
-        res.render("home.ejs",{user: user,Session: inSession})
+        res.render("perfil.ejs",{user: user,Session: inSession})
     }
 })
 app.get('/upar',function(req,res){
@@ -262,8 +266,7 @@ app.get('/noticias',async function(req,res){
     try {
         await client.connect();
         const result = await client.db("myProject").collection("Noticias").find().toArray()
-        console.log(result)
-        res.render('noticias.ejs',{noticias: result})
+        res.render('noticias.ejs',{noticias: result,Session:inSession,user:user})
     } catch (e) {
         console.error(e);
     }  
@@ -275,15 +278,9 @@ app.get('/noticia/:id',async function(req,res){
     try {
         await client.connect();
         var o_id = new mongodb.ObjectID(req.params.id);
-        const result = await client.db("myProject").collection("Noticias").findOne({'_id': o_id})
+        const result = await client.db("myProject").collection("Noticias").findOne({ '_id': o_id });
         const comments = await client.db("myProject").collection("Comentarios").find({'from': req.params.id}).toArray()
-        console.log(result)
-        console.log(comments)
-        if(inSession == true){
-            res.render('page.ejs',{page: result, tipo:"noticia",comentarios: comments,userID: user._id})
-        }else{
-            res.render('page.ejs',{page: result, tipo:"noticia",comentarios: comments,userID: null})
-        }
+        res.render('page.ejs',{page: result, tipo:'noticia',comentarios: comments,Session: inSession,user: user})
     } catch (e) {
         console.error(e);
     }  
@@ -296,7 +293,7 @@ app.get('/dicas',async function(req,res){
         await client.connect();
         const result = await client.db("myProject").collection("Dicas").find().toArray()
         console.log(result)
-        res.render('dicas.ejs',{dicas: result})
+        res.render('dicas.ejs',{dicas: result,Session:inSession,user:user})
     } catch (e) {
         console.error(e);
     }  
@@ -313,12 +310,10 @@ app.get('/cadastroDica',function(req,res){
 app.get('/dica/:id',async function(req,res){
     try {
         await client.connect();
-        var o_id = new mongodb.ObjectID(req.params.id);
-        const result = await client.db("myProject").collection("Dicas").findOne({'_id': o_id})
+        var o_id = new mongodb.ObjectId(req.params.id);
+        const result = await client.db("myProject").collection("Dicas").findOne({'_id':o_id})
         const comments = await client.db("myProject").collection("Comentarios").find({'from': req.params.id}).toArray()
-        console.log(result)
-        console.log(comments)
-        res.render('page.ejs',{page: result, tipo:"dica",comentarios: comments,Session: inSession,user: user})
+        res.render('informativo.ejs',{page: result, tipo:"dica",comentarios: comments,Session: inSession,user: user})
         
     } catch (e) {
         console.error(e);
@@ -327,10 +322,27 @@ app.get('/dica/:id',async function(req,res){
         await client.close();
     }
 })
-app.post("/addNoticia",urlencodedParser,upload.single('file'),async function(req,res){
+app.get('/informativos/:sessao/:id',async function(req,res){
+    try{
+        await client.connect();
+        var result = null;
+        if(req.params.sessao == "Noticias")
+            result = await client.db("myProject").collection("Noticias").findOne({'pk_id':req.params.id});
+        else{
+            result = await client.db("myProject").collection("Dicas").findOne({'pk_id':req.params.id});
+        }
+        console.log(result)
+        const comments = await client.db("myProject").collection("Comentarios").find({'from':req.params.id}).toArray()
+        res.render('informativo.ejs',{page:result,tipo:req.params.sessao,comentarios:comments,Session: inSession,user: user});
+    }catch(e){
+        console.error(e);
+    }finally{
+        await client.close();
+    }
+})
+app.post("/addNoticia",upload.single('file'),async function(req,res){
 	if (req.file == null){
         res.redirect('/')
-        console.log('não tem imagem bro')
     }else{
         try {
             await client.connect();
@@ -338,7 +350,8 @@ app.post("/addNoticia",urlencodedParser,upload.single('file'),async function(req
                 {
                     titulo: req.body.titulo,
                     conteudo: req.body.conteudo,
-                    imagem: req.file.filename
+                    imagem: req.file.filename,
+                    pk_id: `Noticias${Date.now()}`
                 }
             );       
         } catch (e) {
@@ -350,7 +363,7 @@ app.post("/addNoticia",urlencodedParser,upload.single('file'),async function(req
         }
     }
 })
-app.post("/addDica",urlencodedParser,upload.single('file'),async function(req,res){
+app.post("/addDica",upload.single('file'),async function(req,res){
 	if (req.file == null){
         res.redirect('/')
         console.log('não tem imagem bro')
@@ -361,7 +374,8 @@ app.post("/addDica",urlencodedParser,upload.single('file'),async function(req,re
                 {
                     titulo: req.body.titulo,
                     conteudo: req.body.conteudo,
-                    imagem: req.file.filename
+                    imagem: req.file.filename,
+                    pk_id: `Dicas${Date.now()}`
                 }
             );       
         } catch (e) {
@@ -419,7 +433,7 @@ app.post('/comentar/:sessao/:id',async function(req,res){
     if(inSession == true){
         try {
             await client.connect();
-            if(req.body.conteudo.length){
+            if(req.body.conteudo.length > 0){
                 await addComment(client,
                     {
                         commentedBy: user._id,
@@ -430,7 +444,7 @@ app.post('/comentar/:sessao/:id',async function(req,res){
                     }
                 );          
             }
-            res.redirect(`/${req.params.sessao}/${req.params.id}`)
+            res.redirect(`/informativos/${req.params.sessao}/${req.params.id}`)
         } catch (e) {
             console.error(e);
         }
@@ -443,24 +457,72 @@ app.post('/comentar/:sessao/:id',async function(req,res){
     
 })
 app.get('/deleteCom/:infoId/:sessao/:id',async function(req,res){
-    console.log("apagando")
-    if(user._id == req.params.id){
         try {
             await client.connect();
-            var o_id = new mongodb.ObjectID(req.params.id);
+            var o_id = new mongodb.ObjectId(req.params.id)
             await client.db("myProject").collection("Comentarios").deleteOne({'_id':o_id})
         } catch (e) {
             console.error(e);
         }
         finally {
             await client.close();
-            res.redirect(`/${req.params.sessao}/${req.params.id}`)
+            console.log("apagou")
+            res.redirect(`/informativos/${req.params.sessao}/${req.params.infoId}`);
         }
+})
+app.get('/Doacoes/:forma',function(req,res){
+    if(inSession == true){
+        res.render(`doacoes${req.params.forma}.ejs`)
     }else{
-        res.redirect(`/${req.params.sessao}/${req.params.infoId}`)
+        res.redirect('/loginUsuario')
     }
 })
-
+app.post('/doar',async function(req,res){
+    if(inSession == true){
+        if(req.body.valorDoado > 0 && req.body.numero > 0 && req.body.numero.length >= 16 &&req.body.titular != "" 
+        && req.body.mes > 0 && req.body.mes <= 12 && req.body.ano > 2022 && req.body.cvv.length == 3){
+            try{
+                await client.connect();
+                const result = await client.db("myProject").collection("Arrecadacao").findOne({'_id':new mongodb.ObjectId('639725dc7b0ec6b6eb1a0831')})
+                await client.db("myProject").collection("Arrecadacao").updateOne({'_id':new mongodb.ObjectId('639725dc7b0ec6b6eb1a0831')},{$set: {'vezesDoadas':result.vezesDoadas + 1,'totalArrecadado': result.totalArrecadado + (mongodb.Int32)(req.body.valorDoado)}})
+                await client.db("myProject").collection("Usuarios").updateOne({'_id':user._id},{$set: {'vezesDoadas':user.vezesDoadas + 1,'quantidadeDoada':user.quantidadeDoada + (mongodb.Int32)(req.body.valorDoado)}})
+                user = await client.db("myProject").collection("Usuarios").findOne({'_id':user._id})
+                console.log("foi")
+            }catch(e){
+                console.error(e)
+            }finally{
+                await client.close()
+                res.redirect('/')
+            }
+        }else{
+            console.log('não foi')
+            res.redirect('/Doacoes/Cartao')
+        }
+    }else{
+        res.redirect('/loginUsuario')
+    }
+    
+})
+app.get('/deleteInfo/:sessao/:id',async function(req,res){
+    try {
+        await client.connect();
+        var o_id = new mongodb.ObjectId(req.params.id)
+        await client.db("myProject").collection(req.params.sessao).deleteOne({'_id':o_id})
+    } catch (e) {
+        console.error(e);
+    }
+    finally {
+        await client.close();
+        console.log("apagou")
+        res.redirect(`/${req.params.sessao}`);
+    }
+})
+app.get('/sobrenos',function(req,res){
+    res.render('sobreNos.ejs');
+})
+app.get('/contato',function(req,res){
+    res.render('contato.ejs');
+})
 app.listen(port,hostname, ()=>{
     console.log(`http://${hostname}/${port}/`)
 })
